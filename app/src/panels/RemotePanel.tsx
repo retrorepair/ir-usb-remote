@@ -223,17 +223,32 @@ function Setup({ savedCount }: { savedCount: number }) {
         </div>
       )}
 
-      {frame && (
-        <div className="card">
-          <h2 style={{ marginTop: 0 }}>Not listed, or none of them right?</h2>
+      {/*
+        * Always rendered, never gated on having captured a frame. It used to
+        * sit inside a `frame && ...` block, which meant that returning here
+        * after deleting a remote showed no search box at all until another
+        * button was pressed -- indistinguishable from the control being
+        * broken. Searching the database by name is also perfectly reasonable
+        * before pointing a remote at anything.
+        */}
+      <div className="card">
+        <h2 style={{ marginTop: 0 }}>Not listed, or none of them right?</h2>
           <div className="row">
-            <button onClick={() => setShowTemplates((v) => !v)}>
+            <button
+              onClick={() => setShowTemplates((v) => !v)}
+              disabled={!frame}
+              title={frame ? undefined : 'Press a button on the remote first'}
+            >
               {showTemplates ? 'Hide layouts' : 'Start from a blank layout'}
             </button>
-            <span className="hint">Then press each button once to learn its code.</span>
+            <span className="hint">
+              {frame
+                ? 'Then press each button once to learn its code.'
+                : 'Press a button on the remote first, so the layout records its protocol.'}
+            </span>
           </div>
 
-          {showTemplates && (
+          {showTemplates && frame && (
             <div className="chips" style={{ marginTop: 12 }}>
               {TEMPLATES.map((t) => (
                 <button
@@ -281,8 +296,7 @@ function Setup({ savedCount }: { savedCount: number }) {
               </table>
             </div>
           )}
-        </div>
-      )}
+      </div>
     </>
   );
 }

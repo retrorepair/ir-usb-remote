@@ -4,7 +4,7 @@
  * One module-level Device instance is shared by every panel, so switching
  * tabs never drops the connection or the learn-mode state.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { device, DEV_VID, DEV_PID } from './shared/device';
 import { WireMode, MODEF_RAW_CAPTURE, type WireInfo, type WireSettings } from './shared/wire';
 import type { IrEventWithRaw } from './shared/device';
@@ -114,24 +114,36 @@ export function useIrStream(
   onFrame: (e: IrEventWithRaw) => void,
   withRaw = false
 ) {
+  /*
+   * The callback is held in a ref rather than used as an effect dependency.
+   *
+   * Callers legitimately rebuild it whenever their state changes -- the
+   * layout editor's depends on the button list, so it changes on every
+   * keystroke in a label field. As a dependency that tore the stream down and
+   * rebuilt it each time, sending the device a SET_MODE(normal) followed by a
+   * SET_MODE(learn) per character, and dropping any frame that arrived in
+   * between.
+   */
+  const cb = useRef(onFrame);
+  useEffect(() => {
+    cb.current = onFrame;
+  }, [onFrame]);
+
   useEffect(() => {
     if (!enabled || !device.connected) return;
 
-    const un = device.onIr(onFrame);
-    let active = true;
+    const un = device.onIr((e) => cb.current(e));
 
     void device
       .setMode(WireMode.Learn, withRaw ? MODEF_RAW_CAPTURE : 0)
       .catch(() => undefined);
 
     return () => {
-      active = false;
       un();
       /* Always hand the device back in a state where the remote works. */
       void device.setMode(WireMode.Normal, 0).catch(() => undefined);
-      void active;
     };
-  }, [enabled, onFrame, withRaw]);
+  }, [enabled, withRaw]);
 }
 
 export const USING_DEV_IDS = (info: WireInfo | null) =>

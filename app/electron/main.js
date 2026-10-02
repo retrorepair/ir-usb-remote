@@ -16,6 +16,15 @@ const fs = require('node:fs/promises');
 /* Must match board_config.h and the vendor usage page in usb_descriptors.c. */
 const CONFIG_USAGE_PAGE = 0xff00;
 
+/*
+ * USB vendor IDs this app is willing to talk to.
+ *
+ * 0x1209 is the pid.codes range the firmware defaults to. If you rebuild the
+ * firmware with your own allocation (see docs/branding.md), add it here as
+ * well, or the configurator will refuse to open your hardware.
+ */
+const ALLOWED_VENDOR_IDS = new Set([0x1209]);
+
 const isDev = !app.isPackaged && !!process.env.VITE_DEV_SERVER_URL;
 
 function createWindow() {
@@ -45,10 +54,19 @@ function createWindow() {
   ses.setPermissionCheckHandler((_wc, permission) => permission === 'hid');
   ses.setPermissionRequestHandler((_wc, permission, cb) => cb(permission === 'hid'));
 
-  /* Remember the grant so the device reconnects silently next launch. */
+  /*
+   * Remember the grant so the device reconnects silently next launch.
+   *
+   * This handler CANNOT inspect collections. Electron passes only name,
+   * vendorId, productId and serialNumber here -- verified by logging it --
+   * so a usagePage test silently evaluates to undefined and denies every
+   * device, including ours. The precise interface choice is therefore made
+   * in select-hid-device below, which does receive collections; this gate
+   * only decides which devices are eligible at all.
+   */
   ses.setDevicePermissionHandler((details) => {
     if (details.deviceType !== 'hid') return false;
-    return !!details.device?.collections?.some((c) => c.usagePage === CONFIG_USAGE_PAGE);
+    return ALLOWED_VENDOR_IDS.has(details.device?.vendorId);
   });
 
   /*
