@@ -69,6 +69,68 @@ The firmware defaults to GP3 but takes any GPIO:
 The configurator shows which pin the connected unit was built for, under
 **Receiver**, so there is never any doubt about a board you flashed months ago.
 
+## Salvaging a TV sensor board
+
+A sensor board out of a dead TV works well — often better than a bare TSOP,
+because it already has a moulded lens and ESD protection. The catch is that
+these boards are proprietary, carry four to eight unlabelled wires, and no
+manufacturer publishes a pinout.
+
+They are still easy to work out, because the part you care about needs only
+three connections no matter how many pins its package has. A Samsung
+BN41-02150A, for instance, carries a nine-lead module — but that is an IR
+receiver and the TV's standby LED moulded together, and most of those leads
+are die-attach and shield.
+
+### Finding the wires
+
+With the board **unpowered** and a multimeter:
+
+1. **Ground** — continuity from each wire to the large copper pour, or to the
+   plated ring around a mounting hole. Exactly one wire beeps.
+2. **Supply** — find the decoupling capacitor nearest the sensor. It sits
+   between the supply pin and ground; the wire feeding its non-ground side is
+   Vcc.
+3. **Separate the LED wires from the signal.** Put the meter in **diode
+   mode** and probe each remaining wire against ground. An indicator LED
+   shows a real diode drop of 1.8–2.2 V, and on many meters will visibly
+   glow. **The IR output shows no diode drop.** That one test splits them.
+
+Any wire left over is usually an ambient-light ("eco") sensor, which outputs
+a slowly-varying analogue level rather than digital pulses — harmless, and
+easy to spot because shading the board changes it.
+
+### Finding the output without guessing
+
+`build/irprobe.uf2` exists for this. It watches **GP2 to GP9 at once** and
+reports which pin carries IR, so there is no rewire-and-reflash cycle per
+candidate.
+
+1. Flash `irprobe.uf2` the same way as the main firmware.
+2. Power the sensor board from **3V3 and GND**.
+3. Connect every unidentified wire to a different pin in GP2–GP9.
+4. Open the USB serial port it creates (any terminal; baud rate is ignored).
+5. Press a button on a remote.
+
+```
+GP5   67 edges  NEC        addr=0x0707 cmd=0x02  32b
+--- idle levels: GP2=L(0) GP3=H(0) GP4=H(0) GP5=H(4) GP6=L(0) ...
+```
+
+The pin reporting bursts is the output. A pin idling HIGH with no bursts is
+probably the supply or an unused line; one idling LOW is not the output.
+
+Undecodable bursts get their raw timings printed, which is what to look at if
+a board needs different biasing or a wire is picking up something else.
+
+Then move that wire to GP3 and flash the real firmware — or keep it where it
+is and rebuild with `.\build.ps1 -IrGpio 5`.
+
+> ⚠️ **Power salvaged boards from 3V3, never VBUS.** RP2040 GPIOs are not 5 V
+> tolerant. These receivers run happily at 3.3 V even if the TV fed them 5 V,
+> and at 3.3 V their output is safe for the RP2040. Current draw should be
+> around 1 mA; tens of mA means a wire is wrong — stop and recheck.
+
 ## Placement
 
 - Keep the receiver's dome facing out of the enclosure with line of sight to

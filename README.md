@@ -42,6 +42,7 @@ remote and fills in every other button's code without any learning at all.
 |---|---|
 | `firmware/` | RP2040 firmware (C, Pico SDK 2.1.1 + TinyUSB) |
 | `firmware/test/` | Host-side decoder tests — real waveforms, run on your PC |
+| `firmware/tools/irprobe.c` | Finds the IR output on a salvaged sensor board by watching GP2–GP9 at once |
 | `app/` | Windows configurator (Electron + React + TypeScript) |
 | `tools/db-build/` | Builds the bundled remote database from Flipper-IRDB |
 | `tools/check-protocol-sync.mjs` | Proves the C and TypeScript protocol definitions agree |

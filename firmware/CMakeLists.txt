@@ -36,8 +36,17 @@ add_executable(ir_usb_remote
     src/usb_descriptors.c
 )
 
+#
+# src/ is on the include path because tusb_config.h lives there rather than in
+# include/. That is deliberate: TinyUSB finds tusb_config.h through the
+# target's include path, and this one declares a HID-only device with CDC
+# switched off. If it sat in the shared include/ directory, the irprobe target
+# below would pick it up too and the SDK's USB-serial descriptors would fail
+# to compile.
+#
 target_include_directories(ir_usb_remote PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/include
+    ${CMAKE_CURRENT_LIST_DIR}/src
 )
 
 target_compile_definitions(ir_usb_remote PRIVATE
@@ -74,3 +83,29 @@ pico_enable_stdio_uart(ir_usb_remote 0)
 
 # .uf2 for drag-and-drop flashing, plus .elf/.bin/.map/.dis for debugging.
 pico_add_extra_outputs(ir_usb_remote)
+
+# ---------------------------------------------------------------------------
+# irprobe - utility for identifying the IR output on a salvaged sensor board.
+#
+# A separate .uf2 rather than a mode of the real firmware: it needs USB serial
+# output, which the receiver deliberately does not have because that interface
+# belongs to the HID device.
+# ---------------------------------------------------------------------------
+option(BUILD_IRPROBE "Build the IR pin-finder utility" ON)
+
+if(BUILD_IRPROBE)
+    add_executable(irprobe
+        tools/irprobe.c
+        src/ir_decode.c
+        src/ir_protocol.c
+    )
+    target_include_directories(irprobe PRIVATE ${CMAKE_CURRENT_LIST_DIR}/include)
+    target_compile_options(irprobe PRIVATE -Wall -Wextra -Wno-unused-parameter)
+    target_link_libraries(irprobe PRIVATE pico_stdlib)
+
+    # The whole point of this one is a serial console.
+    pico_enable_stdio_usb(irprobe 1)
+    pico_enable_stdio_uart(irprobe 0)
+
+    pico_add_extra_outputs(irprobe)
+endif()
