@@ -104,11 +104,18 @@ export function ActionPicker({
     return out;
   }, [list, filter]);
 
+  /*
+   * A keyboard action with no key but some modifiers is valid: MiSTer's USER
+   * button is Left Ctrl + Left Alt + Right Alt with no ordinary key at all.
+   * Only the total absence of both counts as "nothing bound".
+   */
   const action: Action =
-    usage === 0
+    kind === 'key'
+      ? usage === 0 && mods === 0
+        ? { type: ActionType.None }
+        : { type: ActionType.Key, usage, mods }
+      : usage === 0
       ? { type: ActionType.None }
-      : kind === 'key'
-      ? { type: ActionType.Key, usage, mods }
       : kind === 'media'
       ? { type: ActionType.Consumer, usage }
       : { type: ActionType.System, usage };
@@ -206,7 +213,11 @@ export function ActionPicker({
           <button onClick={() => onSave({ type: ActionType.None }, false)}>Clear mapping</button>
           <div className="spacer" />
           <button onClick={onCancel}>Cancel</button>
-          <button className="primary" disabled={usage === 0} onClick={() => onSave(action, noRepeat)}>
+          <button
+            className="primary"
+            disabled={action.type === ActionType.None}
+            onClick={() => onSave(action, noRepeat)}
+          >
             Save
           </button>
         </footer>

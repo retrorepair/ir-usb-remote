@@ -30,6 +30,7 @@ export function KeymapPanel({ onNext }: { onNext: () => void }) {
   const profile = activeProfile();
   const keymap = activeKeymap();
   const [editing, setEditing] = useState<string | null>(null);
+  const [view, setView] = useState<'grid' | 'list'>('grid');
 
   if (!profile) {
     return (
@@ -111,6 +112,8 @@ export function KeymapPanel({ onNext }: { onNext: () => void }) {
 
   const sorted = [...profile.buttons].sort((a, b) => a.row - b.row || a.col - b.col);
   const mapped = sorted.filter((b) => keymap.bindings[b.id]).length;
+  /* Same column count the remote editor uses, so both views line up. */
+  const cols = Math.max(2, ...profile.buttons.map((b) => b.col + 1));
   const editingButton = sorted.find((b) => b.id === editing) ?? null;
 
   return (
@@ -136,6 +139,20 @@ export function KeymapPanel({ onNext }: { onNext: () => void }) {
           </span>
           <div className="spacer" />
           <div className="row tight" style={{ alignSelf: 'end' }}>
+            <div className="chips">
+              <button
+                className={`chip ${view === 'grid' ? 'on' : ''}`}
+                onClick={() => setView('grid')}
+              >
+                Remote layout
+              </button>
+              <button
+                className={`chip ${view === 'list' ? 'on' : ''}`}
+                onClick={() => setView('list')}
+              >
+                List
+              </button>
+            </div>
             <button onClick={() => setActiveKeymap(null)}>Switch mapping</button>
             <button
               className="danger"
@@ -147,6 +164,40 @@ export function KeymapPanel({ onNext }: { onNext: () => void }) {
         </div>
       </div>
 
+      {/*
+        * The visual layout mirrors the remote's own grid, so a mapping can be
+        * checked at a glance against the thing in your hand. The table below
+        * stays available because it shows the repeat setting and the IR code,
+        * which do not fit legibly on a button.
+        */}
+      {view === 'grid' && (
+        <div className="card">
+          <div className="remote-grid" style={{ ['--cols' as string]: cols }}>
+            {sorted.map((b) => {
+              const a = keymap.bindings[b.id];
+              return (
+                <button
+                  key={b.id}
+                  className={`rbtn ${a ? '' : 'unlearned'}`}
+                  onClick={() => setEditing(b.id)}
+                  title={b.key ? 'Click to change what this sends' : 'No IR code learned yet'}
+                >
+                  <span>{b.label}</span>
+                  <span className="act">{actionToText(a)}</span>
+                  {!b.key && <span className="sub">no IR code</span>}
+                </button>
+              );
+            })}
+          </div>
+          <p className="hint" style={{ marginBottom: 0, marginTop: 14 }}>
+            Click any button to change it. Dashed outlines are unmapped; a
+            button marked “no IR code” will not be written to the receiver
+            until it is learned on the Remote screen.
+          </p>
+        </div>
+      )}
+
+      {view === 'list' && (
       <div className="card pad0">
         <div className="scroll" style={{ maxHeight: 'none' }}>
           <table>
@@ -187,6 +238,7 @@ export function KeymapPanel({ onNext }: { onNext: () => void }) {
           </table>
         </div>
       </div>
+      )}
 
       <div className="row" style={{ marginTop: 16 }}>
         <button className="primary" onClick={onNext} disabled={mapped === 0}>

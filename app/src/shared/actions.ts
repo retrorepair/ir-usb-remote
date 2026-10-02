@@ -139,8 +139,15 @@ export function actionToText(a: Action | undefined): string {
   if (!a || a.type === ActionType.None) return '—';
   switch (a.type) {
     case ActionType.Key: {
-      const name = KEY_LABEL.get(a.usage) ?? `0x${a.usage.toString(16)}`;
       const m = modsToText(a.mods);
+      /*
+       * A chord of modifiers with no ordinary key is a real binding, not an
+       * incomplete one: MiSTer's USER button is Left Ctrl + Left Alt + Right
+       * Alt and nothing else. The firmware sends it correctly already --
+       * usage 0 simply leaves the keycode slot empty.
+       */
+      if (a.usage === 0) return m ? `${m} (modifiers only)` : '—';
+      const name = KEY_LABEL.get(a.usage) ?? `0x${a.usage.toString(16)}`;
       return m ? `${m} + ${name}` : name;
     }
     case ActionType.Consumer:
@@ -274,6 +281,67 @@ export const PRESETS: Preset[] = [
       info: key(0x05), // B, blank screen
       vol_up: con(0x00e9),
       vol_down: con(0x00ea),
+      mute: con(0x00e2),
+    },
+  },
+  {
+    id: 'mister',
+    name: 'MiSTer FPGA',
+    description:
+      "MiSTer's OSD and global hotkeys: F12 opens the menu, arrows navigate, and the two reset chords sit on the colour keys.",
+    map: {
+      ...ARROWS,
+      ...DIGITS,
+      menu: key(0x45), // F12, open the OSD
+      home: key(0x45),
+      back: key(0x29), // Escape
+      exit: key(0x29),
+      play_pause: key(0x2c), // Space
+      source: key(0x45, KMOD.LALT), // Alt+F12, quick core select
+      /*
+       * MiSTer's USER button -- reset within the emulated system -- is a
+       * chord of modifiers with no ordinary key. The firmware sends that
+       * correctly; the keycode slot is simply left empty.
+       */
+      red: key(0, KMOD.LCTRL | KMOD.LALT | KMOD.RALT),
+      /* Full MiSTer reset, back to the Menu core. */
+      green: key(0, KMOD.LSHIFT | KMOD.LCTRL | KMOD.LALT | KMOD.RALT),
+      vol_up: con(0x00e9),
+      vol_down: con(0x00ea),
+      mute: con(0x00e2),
+    },
+  },
+  {
+    id: 'mister-dvd',
+    name: 'MiSTer DVD player',
+    description:
+      "The DVD core's own keys, from its manual: transport, disc/title/chapter menus, and subtitle, audio and angle cycling.",
+    map: {
+      ...ARROWS,
+      ...DIGITS, // 0-9 select menu buttons by number
+      play_pause: key(0x2c), // Space
+      play: key(0x2c),
+      pause: key(0x2c),
+      stop: key(0x14), // Q
+      prev: key(0x4b), // Page Up, previous chapter
+      next: key(0x4e), // Page Down, next chapter
+      rewind: key(0x15), // R
+      fast_forward: key(0x09), // F
+      back: key(0x29), // Escape, go up
+      exit: key(0x29),
+      menu: key(0x10), // M, disc menu
+      home: key(0x17), // T, title menu
+      guide: key(0x3e), // F5, chapter menu
+      subtitle: key(0x16), // S
+      audio: key(0x04), // A
+      info: key(0x07), // D, toggle the status line
+      source: key(0x1d), // Z, cycle aspect ratio
+      /*
+       * The core's own volume keys rather than media keys: these change the
+       * player's output directly, which is what you want on the core itself.
+       */
+      vol_up: key(0x57), // Keypad +
+      vol_down: key(0x56), // Keypad -
       mute: con(0x00e2),
     },
   },

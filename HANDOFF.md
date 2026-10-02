@@ -1,85 +1,65 @@
 # Handoff — 2 October 2026
 
-First session. Project built from scratch to a working, verified state.
+Built from scratch and **validated end to end on real hardware** in one session.
 
-## State: working, not yet tested against real hardware
+## State: working
 
-Everything builds and runs. The one thing that has **not** happened is a test
-with an actual RP2040 and an actual remote — no hardware was connected during
-this session. Everything else was verified, not assumed.
+A salvaged Samsung BN41-02150A sensor board on a Pico, driven by a Sky remote
+and a Sony remote, configured through the desktop app, with the TV's own
+indicator LED as the activity light.
 
-### Verified in this session
+### Verified on hardware
 
-| What | How |
+| What | Evidence |
 |---|---|
-| IR decoders | 89 checks, all passing. Synthesised waveforms for every protocol, run on the host. |
-| Firmware builds | `ir_usb_remote.uf2`, 62 KB. 31 KB flash, 16 KB RAM used. |
-| Protocol sync | 45 checks comparing the C headers against the TypeScript mirror. |
-| Database build | 8,901 source files → 5,199 remotes, 152,600 buttons, 3.1 MB. |
-| Database lookups | Spot-checked in the running app: NEC `0x04` → LG/Vizio, NECext `0x7201` → Akai, Samsung32 `0x0E0E` → real TVs. |
-| Renderer | Typechecks clean, builds, renders, zero console errors. |
-| Packaged app | `release/win-unpacked` launches, opens its window, 4 Electron processes. |
+| IR reception | Sony SIRC12 and Sky RC6-6-20 decoded live |
+| Salvaged sensor board | pinout mapped; pins 2/5/6 are GND/Vcc/IR out |
+| USB enumeration | all three HID interfaces, serial `5303284748AB2E1C` |
+| Hand-written system-control descriptor | Windows parsed it |
+| WebHID connect | works from the packaged app |
+| Status LED | blinks on receive, on the TV's own LED via GP15 |
+| Decoders | 95 host checks, including two real captured waveforms |
+| Protocol sync | 45 checks, C headers against the TypeScript mirror |
+| Installer | NSIS + portable, both build, app launches |
 
-### Not verified
+### Bugs real hardware found that nothing else would have
 
-- **Anything requiring hardware.** USB enumeration, the three HID interfaces,
-  WebHID actually opening the vendor interface, flash commit, real IR
-  reception, and whether held-button behaviour feels right.
+1. **WebHID connect never worked.** `setDevicePermissionHandler` tested
+   `details.device.collections`, which Electron does not populate there, so
+   every device was denied on every machine.
+2. **The status LED compiled away entirely.** `led.c` resolved `IR_LED_GPIO`
+   from `PICO_DEFAULT_LED_PIN` without including the SDK header that defines
+   it, so the file became do-nothing stubs. `main.c` saw the right value, so
+   nothing warned.
+3. **20-bit RC6 was truncated to 16.** Sky remotes use RC6-6-20; rounding the
+   bit count down to a byte boundary discarded the only four bits carrying the
+   command, and every button decoded as address 0, command 0.
+4. **The search box vanished** after deleting a remote, because it sat inside
+   a `frame && ...` block.
+5. **`build.ps1` could not run at all** — `$Pid` is a read-only PowerShell
+   automatic variable, `Get-Command` rejects a null name, and Python resolved
+   to the Microsoft Store alias stub.
 
-Installer artifacts now build and were verified:
+## Still outstanding
 
-```
-79.4 MB  IR Remote Configurator Setup 1.0.0.exe      (NSIS)
-79.1 MB  IR Remote Configurator Portable 1.0.0.exe
-```
+- **A real USB VID/PID.** Still the pid.codes test pair `1209:0001`. The app
+  warns on screen. See docs/branding.md. Note it now appears in two places:
+  the firmware build and `ALLOWED_VENDOR_IDS` in `app/electron/main.js`.
+- **Code signing.** Unsigned installers trip SmartScreen.
+- **Sky remotes do not match the database.** Flipper parses Sky as RC6 mode 0
+  address `0xF3`; we decode mode 6 with a 20-bit payload. Learning works
+  perfectly, so only the pre-filled layout is lost. Worth reconciling if Sky
+  support matters commercially.
+- Sharp, Denon and RCA decoders — reserved, unimplemented, covered by the raw
+  hash.
+- Held JVC buttons do not auto-repeat (JVC omits the header on repeats).
+- macOS and Linux packaging.
 
-## Next steps, in order
+## Notes for next time
 
-1. **Flash a board and plug it in.** `cd firmware; .\build.ps1 -Test`, then
-   hold BOOTSEL and copy the `.uf2`. Check Windows enumerates a keyboard and
-   that Device Manager shows three HID interfaces.
-2. **Connect from the configurator.** This is the highest-risk untested path:
-   the `select-hid-device` handler in `app/electron/main.js` must pick the
-   `0xFF00` collection, and `setDevicePermissionHandler` must grant it. If
-   connect silently fails, that is where to look first.
-3. **Wire a TSOP38238 to GP3** and check Diagnostics shows decoded frames.
-4. **Run through a real remote end to end** — identify, correct the layout,
-   map, save permanently, unplug, replug, confirm it still works.
-5. **Tune `release_timeout_ms`** against a real remote. The 250 ms default is
-   reasoned from protocol repeat intervals, not measured.
-
-## Known issues
-
-**npm 11 blocks postinstall scripts.** Already approved on this machine. On a
-fresh clone: `npm install-scripts approve electron esbuild`.
-
-**The ARM toolchain winget package would not install.** Its elevated installer
-returned `0x800704c7` (cancelled) twice. Installed from the portable zip into
-`C:\Users\joelw\arm-toolchain` instead; `build.ps1` looks there. Documented in
-docs/flashing.md.
-
-## Decisions taken that differ from the original brief
-
-**One For All codes are not used.** UEI's setup-code database is proprietary
-and not licensed for redistribution, so it could not safely ship in a product
-for sale. Replaced with protocol-level decoding plus the CC0-licensed
-Flipper-IRDB. You confirmed this direction, with the requirement that the
-button layout be correctable and kept separate from the keyboard mapping —
-which is how it is built.
-
-**Electron, not a web app.** Your call. Driven through Chromium's WebHID
-rather than `node-hid`, so there are no native modules to compile.
-
-## Things deliberately left for later
-
-- Sharp, Denon and RCA decoders. Reserved in the enum, not implemented — all
-  three are headerless and risk false positives. Those remotes work via the
-  raw timing hash today.
-- Held JVC buttons do not auto-repeat (JVC omits the header on repeat frames).
-  Documented in docs/ir-protocols.md.
-- macOS and Linux builds of the configurator. The renderer is portable; only
-  electron-builder targets would need adding.
-- Code signing. See docs/branding.md.
-- **A real USB VID/PID.** The build defaults to the pid.codes test pair
-  `1209:0001`, which must not ship. The app shows a warning banner whenever it
-  sees it.
+- `irprobe.uf2` finds the IR output on an unknown board by watching GP2–GP9 at
+  once and printing raw timings for every burst. It also accepts the
+  1200-baud BOOTSEL reset, so reflashing needs no button press.
+- The decoder tests take real captured waveforms, not just synthesised ones.
+  Add captures when a new remote misbehaves; `irprobe` prints them in a form
+  that pastes straight into `test_decode.c`.
