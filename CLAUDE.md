@@ -39,9 +39,17 @@ node ..\tools\check-protocol-sync.mjs
 ```
 
 Add a test to `firmware/test/test_decode.c` for any decoder change. The suite
-has already caught two real bugs that manual testing would have missed — a
+has already caught real bugs that manual testing would have missed: a
 minimum-length guard that silently discarded every NEC repeat frame, and a raw
 hash that collided two different buttons.
+
+When a remote misbehaves, capture it rather than reasoning about it.
+`build/irprobe.uf2` watches GP2–GP9 at once and prints the raw timings of
+every burst in a form that pastes straight into the test file. That is how the
+20-bit RC6 bug was found — a Sky remote decoded as address 0, command 0 on
+every button, and only the waveform showed why. Two real captures are now
+regression tests, and they carry receiver jitter that synthesised frames do
+not.
 
 ## Toolchain locations on this machine
 
