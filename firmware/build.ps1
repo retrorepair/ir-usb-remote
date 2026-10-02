@@ -38,6 +38,9 @@
 param(
     [string]$Board  = 'pico',
     [int]$IrGpio    = 3,
+    # Blank uses the board's own LED. Set it to drive an external one, such as
+    # the indicator LED on a salvaged TV sensor board.
+    [string]$LedGpio = '',
     [string]$UsbVid = '0x1209',
     [string]$UsbPid = '0x0001',
     [string]$BuildType = 'Release',
@@ -174,16 +177,22 @@ if ($Test) {
 }
 
 # --- configure -----------------------------------------------------------
-& $cmake -G Ninja -B $buildDir -S $here `
-    "-DPICO_SDK_PATH=$($sdk -replace '\\','/')" `
-    "-DPICO_TOOLCHAIN_PATH=$($armRoot -replace '\\','/')" `
-    "-DPICO_BOARD=$Board" `
-    "-DCMAKE_BUILD_TYPE=$BuildType" `
-    "-DIR_GPIO=$IrGpio" `
-    "-DUSB_VID=$UsbVid" `
-    "-DUSB_PID=$UsbPid" `
-    "-DCMAKE_MAKE_PROGRAM=$($ninja -replace '\\','/')" `
+$cmakeArgs = @(
+    '-G', 'Ninja', '-B', $buildDir, '-S', $here,
+    "-DPICO_SDK_PATH=$($sdk -replace '\\','/')",
+    "-DPICO_TOOLCHAIN_PATH=$($armRoot -replace '\\','/')",
+    "-DPICO_BOARD=$Board",
+    "-DCMAKE_BUILD_TYPE=$BuildType",
+    "-DIR_GPIO=$IrGpio",
+    "-DUSB_VID=$UsbVid",
+    "-DUSB_PID=$UsbPid",
+    "-DCMAKE_MAKE_PROGRAM=$($ninja -replace '\\','/')",
     '-DCMAKE_POLICY_VERSION_MINIMUM=3.5'
+)
+# Only pass it when set: blank means "use whatever the board file defines".
+if ($LedGpio -ne '') { $cmakeArgs += "-DIR_LED_GPIO=$LedGpio" }
+
+& $cmake @cmakeArgs
 if ($LASTEXITCODE -ne 0) { Write-Host 'Configure failed.' -ForegroundColor Red; exit 1 }
 
 # --- build ---------------------------------------------------------------

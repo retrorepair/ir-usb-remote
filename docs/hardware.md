@@ -131,6 +131,42 @@ is and rebuild with `.\build.ps1 -IrGpio 5`.
 > and at 3.3 V their output is safe for the RP2040. Current draw should be
 > around 1 mA; tens of mA means a wire is wrong — stop and recheck.
 
+### Worked example: Samsung BN41-02150A (`UH5000_IR`)
+
+The IR board from a UH5000-chassis Samsung — UE32J5100, UN58H5202, LT32E390
+and others. Its sensor is a nine-lead module combining the IR receiver, a red
+standby LED and an ambient-light sensor, with a 6-wire cable.
+
+| Cable pin | Function | Connect to |
+|---|---|---|
+| 1 | Red indicator LED, anode | a GPIO, via a resistor — optional |
+| 2 | Ground | GND |
+| 3 | unidentified | leave disconnected |
+| 4 | Ambient light sensor output | leave disconnected |
+| 5 | Vcc | 3V3 |
+| 6 | **IR output** | **GP3** |
+
+Only pins 2, 5 and 6 are needed. Three of the nine module leads do the work;
+the rest serve the LED, the light sensor and the lead frame.
+
+Diode-mode readings against ground were 1.6–2.0 V on every signal pin, which
+is why that test alone cannot finish the job here: forcing a meter's test
+current into an IC supply pin partially powers the chip and lands in the same
+range as an LED's forward voltage. What separates them is that **an LED
+visibly glows** under the diode test and an IC pin does not.
+
+To use the board's own LED as the activity indicator — the TV's standby light
+blinking as codes arrive — wire pin 1 to a spare GPIO and build with:
+
+```powershell
+.\build.ps1 -IrGpio 3 -LedGpio 15
+```
+
+Check first whether the series resistor for that LED is on the sensor board or
+was on the TV's main board. If pin 1 reads only a few ohms to the LED's anode
+pad, there is no resistor on this side: add 220–470 Ω, or the GPIO will be
+driving the LED at whatever its drive strength allows.
+
 ## Placement
 
 - Keep the receiver's dome facing out of the enclosure with line of sight to
