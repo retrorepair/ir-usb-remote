@@ -390,9 +390,17 @@ static ir_decode_result_t decode_rc6(const uint16_t *d, uint16_t n, ir_frame_t *
     else if (lv[8] == 0 && lv[10] == 1) trailer = 0;
     else return IR_DECODE_NONE;
 
-    int nbits = (k - 12) / 2;
-    nbits -= nbits % 8;                 /* payloads are whole bytes */
-    if (nbits != 8 && nbits != 16 && nbits != 24 && nbits != 32)
+    /*
+     * Payload lengths are NOT all whole bytes.
+     *
+     * Mode 6 has a widely used 20-bit form ("RC6-6-20") -- Sky boxes use it.
+     * Rounding the count down to a multiple of 8 reads only the leading 16
+     * bits of such a frame, and on a Sky remote those are all zero: every
+     * button decoded as address 0, command 0, because the four bits that
+     * actually carry the command were the ones discarded.
+     */
+    const int nbits = (k - 12) / 2;
+    if (nbits != 8 && nbits != 16 && nbits != 20 && nbits != 24 && nbits != 32)
         return IR_DECODE_NONE;
 
     uint64_t payload = 0;
@@ -411,6 +419,7 @@ static ir_decode_result_t decode_rc6(const uint16_t *d, uint16_t n, ir_frame_t *
         if (nbits != 16) return IR_DECODE_NONE; /* mode 0 is 8 + 8 */
         out->protocol = IR_PROTO_RC6_0;
     } else if (mode == 6) {
+        /* 8, 16, 20, 24 or 32 bits; the command is always the low byte. */
         out->protocol = IR_PROTO_RC6_6A;
         /*
          * On a 32-bit mode-6 payload (what Media Center remotes send) the

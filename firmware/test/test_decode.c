@@ -335,6 +335,61 @@ static void test_rc6(void)
           (unsigned long long)ir_frame_key(&f1, 0));
 }
 
+/*
+ * A real waveform, captured from a Sky remote through a salvaged Samsung
+ * sensor board, by firmware/tools/irprobe.c. Synthesised frames are clean by
+ * construction; this one carries genuine receiver jitter (mark/space pairs
+ * like 452/469 and 396/495 rather than a tidy 444), so it exercises the
+ * tolerances as well as the framing.
+ *
+ * It is RC6 mode 6 with a TWENTY bit payload -- the "RC6-6-20" form. The
+ * decoder used to round the bit count down to a multiple of 8, read the
+ * leading 16 bits, and report address 0 command 0 for every button on the
+ * remote, because those leading bits are all zero and the only four that
+ * carry the command were the ones discarded.
+ */
+static void test_rc6_20bit_real_capture(void)
+{
+    CASE("RC6-6-20 from a real Sky remote");
+
+    static const uint16_t sky_power[] = {
+        2675, 878, 452, 469, 422, 469, 421, 886, 507, 829, 900, 466, 422, 468,
+        452, 439, 451, 440, 396, 495, 395, 496, 395, 495, 396, 493, 423, 468,
+        423, 468, 423, 467, 424, 467, 423, 468, 423, 468, 421, 470, 420, 471,
+        864, 473, 415, 922, 415, 476, 415
+    };
+    const uint16_t n = (uint16_t)(sizeof(sky_power) / sizeof(sky_power[0]));
+
+    ir_frame_t f;
+    memcpy(d, sky_power, sizeof(sky_power));
+    CHECK(ir_decode(d, n, &f) == IR_DECODE_FRAME, "did not decode");
+    CHECK(f.protocol == IR_PROTO_RC6_6A, "protocol %s", ir_protocol_name(f.protocol));
+    CHECK(f.nbits == 20, "decoded %u bits, expected 20", f.nbits);
+    /* 0x0C is the standard RC5/RC6 standby command, which is what a power
+     * button should send -- a good sign the split is right and not just
+     * self-consistent. */
+    CHECK(f.command == 0x0C, "command 0x%X, expected 0x0C", f.command);
+    CHECK(f.address == 0x000, "address 0x%X", f.address);
+
+    CASE("a corrupt RC6 frame is not decoded as RC6");
+    /*
+     * Also captured live: one frame in ~118 arrived with a 1839 us run, four
+     * time units long. No biphase code can hold a level that long, so it must
+     * not be accepted as a valid frame.
+     */
+    static const uint16_t corrupt[] = {
+        2649, 932, 397, 494, 397, 495, 394, 941, 423, 914, 869, 467, 422, 469,
+        422, 467, 423, 468, 422, 471, 420, 471, 418, 473, 418, 474, 416, 475,
+        416, 474, 415, 476, 415, 476, 415, 476, 415, 476, 415, 476, 415, 500,
+        836, 499, 390, 1839, 390
+    };
+    memcpy(d, corrupt, sizeof(corrupt));
+    const ir_decode_result_t r =
+        ir_decode(d, (uint16_t)(sizeof(corrupt) / sizeof(corrupt[0])), &f);
+    CHECK(!(r == IR_DECODE_FRAME && f.protocol == IR_PROTO_RC6_6A),
+          "accepted a corrupt frame as RC6-6A");
+}
+
 static void test_kaseikyo_jvc(void)
 {
     ir_frame_t f;
@@ -479,6 +534,7 @@ int main(void)
     test_sony();
     test_rc5();
     test_rc6();
+    test_rc6_20bit_real_capture();
     test_kaseikyo_jvc();
     test_no_cross_claiming();
     test_raw_hash();
