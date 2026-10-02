@@ -162,10 +162,22 @@ blinking as codes arrive — wire pin 1 to a spare GPIO and build with:
 .\build.ps1 -IrGpio 3 -LedGpio 15
 ```
 
-Check first whether the series resistor for that LED is on the sensor board or
-was on the TV's main board. If pin 1 reads only a few ohms to the LED's anode
-pad, there is no resistor on this side: add 220–470 Ω, or the GPIO will be
-driving the LED at whatever its drive strength allows.
+**Add your own series resistor.** On this board pin 1 measures 22 Ω to the
+LED's anode, which is an EMI damping resistor for the ribbon cable, not a
+current limiter — the TV drove the LED from its main board with its own
+limiting. Straight off a 3.3 V GPIO, 22 Ω alone would pull roughly
+
+    (3.3 V − 1.9 V) / 22 Ω ≈ 64 mA
+
+against an RP2040 absolute maximum of 12 mA per pin. Adding **330 Ω** brings
+it to about 4 mA, which is a bright indicator and within spec; 470 Ω gives a
+dimmer ~2.8 mA. Measure before assuming any salvaged board limits its own LED
+current.
+
+If the LED does not light when the GPIO drives pin 1 high, try grounding pin 3:
+some boards give the indicator its own return rather than sharing the
+receiver's ground, which keeps LED switching current out of the IR ground
+reference.
 
 ## Placement
 
