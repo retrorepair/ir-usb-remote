@@ -33,7 +33,7 @@ fires the keystrokes it is already bound to into the configurator.
 ## Before committing
 
 ```powershell
-cd firmware; .\build.ps1 -Test     # 89 decoder checks, then the firmware
+cd firmware; .\build.ps1 -Test     # 95 decoder checks, then the firmware
 cd ..\app;   npm run typecheck
 node ..\tools\check-protocol-sync.mjs
 ```
