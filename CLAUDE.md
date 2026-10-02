@@ -66,11 +66,17 @@ native compiler is needed alongside the cross compiler.
 without their binaries and fail at build time. `npm install-scripts approve
 electron esbuild` fixes it.
 
-**The NSIS installer target fails on this machine.** electron-builder's
-`winCodeSign` bundle contains macOS symlinks, and Windows refuses to create
-symlinks without Developer Mode. `npm run dist:dir` works and produces a
-runnable `release/win-unpacked`. For the real installer, enable Developer Mode
-in Settings → System → For developers.
+**electron-builder's winCodeSign bundle contains macOS symlinks** that Windows
+will not create without Developer Mode, so 7-Zip exits 2 and electron-builder
+discards a perfectly good extraction. `app/scripts/prepare-wincodesign.mjs`
+works around it by extracting the bundle itself and putting it where
+electron-builder looks; it runs automatically from `predist`. Do not remove
+it, and note this is not an NSIS problem — rcedit lives in the same bundle, so
+every Windows target hits it.
+
+**The nsis and portable targets need different `artifactName` templates.**
+With a shared one they resolve to the same filename and the portable build
+silently overwrites the installer, leaving one file where two were expected.
 
 **Do not use `sed -i '/^$/d'`-style blank-line stripping on source files.** It
 destroys readability across the whole file.

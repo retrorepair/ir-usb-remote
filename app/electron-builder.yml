@@ -6,7 +6,7 @@ directories:
   output: release
   buildResources: resources
 
-# electron/ is shipped as-is (plain CommonJS, no build step); dist/ is the
+# electron/ ships as-is (plain CommonJS, no build step); dist/ is the
 # Vite-built renderer and already contains the remote database.
 files:
   - electron/**/*
@@ -14,19 +14,29 @@ files:
   - package.json
 
 win:
+  icon: resources/icon.ico
   target:
     - target: nsis
       arch: [x64]
     - target: portable
       arch: [x64]
-  artifactName: ${productName} ${version} ${arch}.${ext}
 
+# The two targets MUST have different artifactName templates. With a shared
+# one they resolve to the same filename and the second build silently
+# overwrites the first, leaving only a portable exe where an installer was
+# expected.
 nsis:
+  artifactName: ${productName} Setup ${version}.${ext}
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   shortcutName: IR Remote Configurator
+  installerIcon: resources/icon.ico
+  uninstallerIcon: resources/icon.ico
+
+portable:
+  artifactName: ${productName} Portable ${version}.${ext}
 
 # NOTE: unsigned builds trigger a SmartScreen warning on first run. See
 # docs/branding.md for what signing a release actually requires.

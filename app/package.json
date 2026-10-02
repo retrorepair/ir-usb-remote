@@ -14,7 +14,11 @@
     "dist": "npm run build && electron-builder --config electron-builder.yml --win",
     "dist:dir": "npm run build && electron-builder --config electron-builder.yml --win --dir",
     "db:build": "node ../tools/db-build/build-db.mjs",
-    "check:protocol": "node ../tools/check-protocol-sync.mjs"
+    "check:protocol": "node ../tools/check-protocol-sync.mjs",
+    "prepare:wincodesign": "node scripts/prepare-wincodesign.mjs",
+    "predist": "node scripts/prepare-wincodesign.mjs",
+    "predist:dir": "node scripts/prepare-wincodesign.mjs",
+    "icon": "node ../tools/make-icon.mjs"
   },
   "devDependencies": {
     "@types/react": "^18.3.12",

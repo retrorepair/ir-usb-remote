@@ -25,7 +25,13 @@ this session. Everything else was verified, not assumed.
 - **Anything requiring hardware.** USB enumeration, the three HID interfaces,
   WebHID actually opening the vendor interface, flash commit, real IR
   reception, and whether held-button behaviour feels right.
-- **The NSIS installer.** Fails on this machine; see below.
+
+Installer artifacts now build and were verified:
+
+```
+79.4 MB  IR Remote Configurator Setup 1.0.0.exe      (NSIS)
+79.1 MB  IR Remote Configurator Portable 1.0.0.exe
+```
 
 ## Next steps, in order
 
@@ -43,12 +49,6 @@ this session. Everything else was verified, not assumed.
    reasoned from protocol repeat intervals, not measured.
 
 ## Known issues
-
-**NSIS installer build fails.** electron-builder's `winCodeSign` bundle
-contains macOS symlinks; Windows refuses to create symlinks without Developer
-Mode, and the extraction fails. `npm run dist:dir` works and produces a
-runnable unpacked app. Fix: enable Developer Mode in Settings → System → For
-developers, then `npm run dist`.
 
 **npm 11 blocks postinstall scripts.** Already approved on this machine. On a
 fresh clone: `npm install-scripts approve electron esbuild`.

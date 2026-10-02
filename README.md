@@ -68,15 +68,35 @@ cd firmware
 ```
 
 ```powershell
-# Configurator: produces app/release/*.exe
+# Configurator
 cd app
 npm install
 npm run dist
 ```
 
+That produces both:
+
+```
+IR Remote Configurator Setup 1.0.0.exe      installer, ~79 MB
+IR Remote Configurator Portable 1.0.0.exe   single-file, no install
+```
+
+If `npm install` warns that install scripts were skipped (npm 11 blocks them
+by default), run `npm install-scripts approve electron esbuild` — Electron's
+binary is downloaded by one of them.
+
+`npm run icon` regenerates `app/resources/icon.ico` from
+`tools/make-icon.mjs`, which draws it rather than storing a binary nobody can
+edit.
+
 `build.ps1` locates CMake, Ninja, arm-none-eabi-gcc, Python and a host GCC
 rather than requiring them on PATH, and tells you exactly what is missing.
 `-Test` builds and runs the decoder test suite first.
+
+The app build needs no Developer Mode and no administrator rights.
+`scripts/prepare-wincodesign.mjs` runs automatically beforehand and works
+around electron-builder discarding a good extraction because two macOS
+symlinks inside its support bundle cannot be created on Windows.
 
 ## Design notes worth knowing
 
