@@ -1,6 +1,20 @@
 /*
  * led.c - status LED driver.
  */
+/*
+ * INCLUDE ORDER IS LOAD-BEARING.
+ *
+ * pico/stdlib.h must come before board_config.h, because board_config.h
+ * resolves IR_LED_GPIO from PICO_DEFAULT_LED_PIN, and that macro only exists
+ * once the SDK's board header has been pulled in. Without it the #ifdef fails,
+ * IR_LED_GPIO becomes -1, and this entire file silently compiles to the
+ * do-nothing stubs at the bottom -- the LED never lights and nothing warns.
+ *
+ * main.c happened to include pico/stdlib.h first, so it saw the correct pin
+ * all along, which is what made the resulting bug so quiet.
+ */
+#include "pico/stdlib.h"
+
 #include "led.h"
 #include "board_config.h"
 

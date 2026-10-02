@@ -77,14 +77,15 @@ static void report(int i)
     printf("\n");
 
     /*
-     * Print the raw timings for an undecodable burst. If the board turns out
-     * to need a different bias or the wire is picking up something else
-     * entirely, this is what shows it.
+     * Always print the raw timings, not only for undecodable bursts. A frame
+     * that decodes to an implausible value -- an address and command of zero,
+     * say -- is a decoder problem, and that is exactly the case where the
+     * timings are needed and the old "only on failure" rule withheld them.
      */
-    if (r == IR_DECODE_NONE && p->count >= 4) {
+    if (p->count >= 4) {
         printf("        timings:");
-        for (uint16_t k = 0; k < p->count && k < 24; k++) printf(" %u", p->us[k]);
-        if (p->count > 24) printf(" ...");
+        for (uint16_t k = 0; k < p->count && k < 80; k++) printf(" %u", p->us[k]);
+        if (p->count > 80) printf(" ...");
         printf("\n");
     }
 }
