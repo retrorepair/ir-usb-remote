@@ -1,0 +1,41 @@
+# ---- build output ----
+firmware/build/
+build/
+*.uf2
+*.elf
+*.bin
+*.hex
+*.map
+*.dis
+
+# ---- node / electron ----
+node_modules/
+app/dist/
+app/dist-electron/
+app/release/
+*.tsbuildinfo
+npm-debug.log*
+pnpm-debug.log*
+yarn-error.log*
+
+# ---- generated / imported databases ----
+db/generated/
+tools/db-build/.cache/
+tools/db-build/sources/
+
+# ---- editors / OS ----
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.shared.json
+.idea/
+*.swp
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# ---- local toolchain pointers ----
+firmware/.env.local
+
+# ---- additional build output ----
+firmware/build-test/
+.build/

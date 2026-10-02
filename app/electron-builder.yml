@@ -1,0 +1,32 @@
+appId: com.openir.irremoteconfigurator
+productName: IR Remote Configurator
+copyright: Copyright (c) 2026
+
+directories:
+  output: release
+  buildResources: resources
+
+# electron/ is shipped as-is (plain CommonJS, no build step); dist/ is the
+# Vite-built renderer and already contains the remote database.
+files:
+  - electron/**/*
+  - dist/**/*
+  - package.json
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: portable
+      arch: [x64]
+  artifactName: ${productName} ${version} ${arch}.${ext}
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  shortcutName: IR Remote Configurator
+
+# NOTE: unsigned builds trigger a SmartScreen warning on first run. See
+# docs/branding.md for what signing a release actually requires.
