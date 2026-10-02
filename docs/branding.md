@@ -24,7 +24,7 @@ Three legitimate routes:
 Build with your allocation:
 
 ```powershell
-.\build.ps1 -Vid 0x1209 -Pid 0xC0DE
+.\build.ps1 -UsbVid 0x1209 -UsbPid 0xC0DE
 ```
 
 Then update `DEV_VID` / `DEV_PID` in `app/src/shared/device.ts` so the

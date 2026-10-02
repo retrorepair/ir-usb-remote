@@ -20,42 +20,65 @@
 .PARAMETER IrGpio
     GPIO the receiver's OUT pin is wired to. Default 3.
 
-.PARAMETER Vid / Pid
+.PARAMETER UsbVid / UsbPid
     USB ids. The defaults are the pid.codes test pair and must NOT ship on
     hardware you sell -- see docs/branding.md.
 
 .EXAMPLE
     .\build.ps1
     .\build.ps1 -Board pico_w -IrGpio 2
-    .\build.ps1 -Vid 0x1209 -Pid 0xC0DE -Clean
+    .\build.ps1 -UsbVid 0x1209 -UsbPid 0xC0DE -Clean
+
+.NOTES
+    The USB id parameters are UsbVid/UsbPid rather than Vid/Pid because $Pid is
+    a read-only PowerShell automatic variable holding the process id, and
+    binding a parameter to that name fails at invocation.
 #>
 [CmdletBinding()]
 param(
     [string]$Board  = 'pico',
     [int]$IrGpio    = 3,
-    [string]$Vid    = '0x1209',
-    [string]$Pid    = '0x0001',
+    [string]$UsbVid = '0x1209',
+    [string]$UsbPid = '0x0001',
     [string]$BuildType = 'Release',
     [switch]$Clean,
     [switch]$Test
 )
 
-$ErrorActionPreference = 'Stop'
+# Deliberately NOT 'Stop'. CMake and the Pico SDK write progress and
+# informational messages to stderr, and under 'Stop' PowerShell turns the
+# first such line from a native command into a terminating error -- so a
+# perfectly successful build aborts. Every native call below checks
+# $LASTEXITCODE explicitly instead, which is the reliable signal.
+$ErrorActionPreference = 'Continue'
 $here = $PSScriptRoot
 
 function Find-Tool {
-    param([string]$Name, [string]$EnvVar, [string[]]$Candidates)
+    param(
+        [string]$Name,
+        [string]$EnvVar,
+        [string[]]$Candidates,
+        # Paths matching this wildcard are ignored even if found on PATH.
+        [string]$Reject
+    )
 
     if ($EnvVar -and (Test-Path env:$EnvVar)) {
         $v = (Get-Item env:$EnvVar).Value
         if (Test-Path $v) { return $v }
         throw "$EnvVar points at '$v', which does not exist."
     }
-    $onPath = Get-Command $Name -ErrorAction SilentlyContinue
-    if ($onPath) { return $onPath.Source }
+    # Name is optional: some tools are only ever looked up by path.
+    if ($Name) {
+        $onPath = Get-Command $Name -ErrorAction SilentlyContinue
+        if ($onPath -and -not ($Reject -and $onPath.Source -like $Reject)) {
+            return $onPath.Source
+        }
+    }
     foreach ($c in $Candidates) {
         $hit = Get-ChildItem -Path $c -ErrorAction SilentlyContinue | Select-Object -First 1
-        if ($hit) { return $hit.FullName }
+        if ($hit -and -not ($Reject -and $hit.FullName -like $Reject)) {
+            return $hit.FullName
+        }
     }
     return $null
 }
@@ -75,12 +98,19 @@ $armGcc = Find-Tool 'arm-none-eabi-gcc' $null @(
     'C:\Program Files (x86)\Arm GNU Toolchain*\*\bin\arm-none-eabi-gcc.exe',
     'C:\Program Files\Arm GNU Toolchain*\*\bin\arm-none-eabi-gcc.exe'
 )
+# Windows ships an "App execution alias" stub at WindowsApps\python.exe that
+# only opens the Microsoft Store. It sits on PATH ahead of real installs and
+# would be picked first, then fail the SDK's boot-stage-2 script with a
+# baffling error, so it is rejected by path.
 $python = Find-Tool 'python' 'PYTHON_EXE' @(
     "$env:LOCALAPPDATA\Programs\Python\Python3*\python.exe",
-    'C:\Python3*\python.exe'
-)
-# picotool is a host program, so this must be a native compiler, not the cross one.
-$hostGcc = Find-Tool $null 'HOST_GCC' @(
+    'C:\Python3*\python.exe',
+    "$env:ProgramFiles\Python3*\python.exe"
+) -Reject '*\WindowsApps\*'
+# picotool is a host program, so this must be a native compiler, not the cross
+# one. Looking for plain 'gcc' is safe: the cross compiler is always named
+# arm-none-eabi-gcc and can never be picked up by that name.
+$hostGcc = Find-Tool 'gcc' 'HOST_GCC' @(
     "$wingetPkgs\BrechtSanders.WinLibs*\mingw64\bin\gcc.exe",
     'C:\msys64\mingw64\bin\gcc.exe'
 )
@@ -150,8 +180,8 @@ if ($Test) {
     "-DPICO_BOARD=$Board" `
     "-DCMAKE_BUILD_TYPE=$BuildType" `
     "-DIR_GPIO=$IrGpio" `
-    "-DUSB_VID=$Vid" `
-    "-DUSB_PID=$Pid" `
+    "-DUSB_VID=$UsbVid" `
+    "-DUSB_PID=$UsbPid" `
     "-DCMAKE_MAKE_PROGRAM=$($ninja -replace '\\','/')" `
     '-DCMAKE_POLICY_VERSION_MINIMUM=3.5'
 if ($LASTEXITCODE -ne 0) { Write-Host 'Configure failed.' -ForegroundColor Red; exit 1 }
@@ -169,7 +199,7 @@ Write-Host "Built $uf2 ($size KB)" -ForegroundColor Green
 Write-Host ''
 Write-Host 'To flash: hold BOOTSEL while plugging the board in, then copy that file'
 Write-Host 'onto the RPI-RP2 drive that appears. The board reboots as a keyboard.'
-if ($Vid -eq '0x1209' -and $Pid -eq '0x0001') {
+if ($UsbVid -eq '0x1209' -and $UsbPid -eq '0x0001') {
     Write-Host ''
     Write-Host 'NOTE: built with the pid.codes TEST USB id. Do not ship this on hardware' -ForegroundColor Yellow
     Write-Host '      you sell -- see docs/branding.md.' -ForegroundColor Yellow

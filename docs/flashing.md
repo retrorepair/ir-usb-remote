@@ -57,7 +57,7 @@ decoder fails before you flash anything. Output lands in
 ```powershell
 .\build.ps1 -Board pico_w          # any PICO_BOARD the SDK knows
 .\build.ps1 -IrGpio 2              # receiver on a different pin
-.\build.ps1 -Vid 0x1209 -Pid 0xC0DE   # your own USB id, see branding.md
+.\build.ps1 -UsbVid 0x1209 -UsbPid 0xC0DE   # your own USB id, see branding.md
 .\build.ps1 -Clean                 # discard the previous build directory
 .\build.ps1 -BuildType Debug
 ```
