@@ -249,6 +249,13 @@ void keymap_tick(void)
     /* Only repeat while frames are genuinely still arriving. */
     if (now - s_last_ms > repeat_stale_ms()) return;
 
+    /*
+     * Never stack a repeat on top of a tap that is still being delivered.
+     * Each tap now holds the key for a minimum duration, so firing again
+     * before it finishes would queue presses faster than they drain.
+     */
+    if (!hid_out_idle()) return;
+
     /* Signed comparison so the 49-day wrap of now_ms() cannot stall a ramp. */
     if ((int32_t)(now - s_next_tap_ms) >= 0) {
         fire(b);

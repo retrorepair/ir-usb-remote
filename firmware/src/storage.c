@@ -58,6 +58,12 @@ void storage_defaults(ir_config_t *cfg)
      * stutters; it only ever loosens the derived value.
      */
     cfg->settings.release_timeout_ms = 200;
+    /*
+     * Minimum time a tapped key stays down. 48 ms spans three frames of a
+     * 60 Hz display, so a consumer that samples keyboard state once per frame
+     * -- a MiSTer core, for one -- cannot miss the press.
+     */
+    cfg->settings.min_press_ms       = MIN_PRESS_MS_DEFAULT;
     cfg->settings.led_mode           = 1; /* blink on receive */
     cfg->settings.flags              = SETF_REPORT_UNMAPPED;
 }

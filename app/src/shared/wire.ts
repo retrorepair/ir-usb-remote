@@ -113,8 +113,12 @@ export interface WireSettings {
   releaseTimeoutMs: number;
   ledMode: number;
   flags: number;
+  /** Minimum time a tapped key stays down, ms. 0 = firmware default. */
+  minPressMs: number;
   toggleRules: WireToggleRule[];
 }
+
+export const MIN_PRESS_MS_DEFAULT = 48;
 
 export interface WireInfo {
   wireVersion: number;
@@ -309,6 +313,9 @@ export function parseSettings(p: DataView): WireSettings {
     releaseTimeoutMs: p.getUint16(4, true),
     ledMode: p.getUint8(6),
     flags: p.getUint8(7),
+    /* Occupies what used to be explicit padding, so the struct size and all
+     * later offsets are unchanged; an older firmware simply reports 0. */
+    minPressMs: p.getUint16(8, true),
     toggleRules,
   };
 }
@@ -321,7 +328,8 @@ export function buildSettings(s: WireSettings): Uint8Array {
   dv.setUint16(4, s.releaseTimeoutMs, true);
   dv.setUint8(6, s.ledMode);
   dv.setUint8(7, s.flags);
-  dv.setUint32(8, 0, true);
+  dv.setUint16(8, s.minPressMs ?? 0, true);
+  dv.setUint16(10, 0, true);
   for (let i = 0; i < CFG_MAX_TOGGLE_RULES; i++) {
     const r = s.toggleRules[i] ?? { protocol: 0, cmdMask: 0 };
     const base = RULES_OFFSET + i * 8;

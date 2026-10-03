@@ -163,7 +163,7 @@ export function DiagnosticsPanel({ dev }: { dev: ReturnType<typeof useDevice> })
             </label>
 
             <label className="field" style={{ flex: '1 1 180px' }}>
-              <span>Media repeat delay (ms)</span>
+              <span>Repeat delay (ms)</span>
               <input
                 type="number"
                 min={0}
@@ -171,11 +171,29 @@ export function DiagnosticsPanel({ dev }: { dev: ReturnType<typeof useDevice> })
                 value={draft.repeatDelayMs}
                 onChange={(e) => setDraft({ ...draft, repeatDelayMs: +e.target.value })}
               />
-              <div className="hint">Before a held volume button starts ramping.</div>
+              <div className="hint">How long a button must be held before it starts repeating.</div>
             </label>
 
             <label className="field" style={{ flex: '1 1 180px' }}>
-              <span>Media repeat rate (ms)</span>
+              <span>Minimum key press (ms)</span>
+              <input
+                type="number"
+                min={8}
+                max={250}
+                value={draft.minPressMs || 48}
+                onChange={(e) => setDraft({ ...draft, minPressMs: +e.target.value })}
+              />
+              <div className="hint">
+                How long a key stays down. Reports go out one per USB poll, so
+                without this a tap lasts a millisecond — fine for a PC, but
+                invisible to anything sampling once per video frame. A MiSTer
+                core at 60 Hz needs at least ~17 ms; 48 ms covers three frames.
+                Raise it if a device misses presses.
+              </div>
+            </label>
+
+            <label className="field" style={{ flex: '1 1 180px' }}>
+              <span>Repeat rate (ms)</span>
               <input
                 type="number"
                 min={20}
@@ -184,7 +202,7 @@ export function DiagnosticsPanel({ dev }: { dev: ReturnType<typeof useDevice> })
                 onChange={(e) => setDraft({ ...draft, repeatRateMs: +e.target.value })}
               />
               <div className="hint">
-                Keyboard keys ignore this — the PC applies its own repeat rate to those.
+Applies to every action type. The firmware generates the repeat itself, so this is not affected by your PC keyboard settings.
               </div>
             </label>
           </div>

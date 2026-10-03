@@ -190,9 +190,30 @@ typedef struct {
     uint16_t release_timeout_ms; /* silence after which the key is released  */
     uint8_t  led_mode;           /* 0 off, 1 blink on receive, 2 always on   */
     uint8_t  flags;              /* SETF_* bits                              */
-    uint32_t pad;                /* keeps toggle_rules at offset 12          */
+    /*
+     * How long a tapped key stays down before the release report is sent.
+     * 0 means use the firmware default.
+     *
+     * This matters more than it sounds. Reports go out one per USB poll, so
+     * without a floor a tap lasts a millisecond or two -- shorter than any
+     * real keypress, and invisible to anything that samples keyboard state
+     * once per video frame rather than handling events. A MiSTer running a
+     * core at 60 Hz has 16.7 ms between samples and misses such a press
+     * entirely, while a PC catches it, which is a confusing way to fail.
+     *
+     * Occupies what was explicit padding, so the structure size and every
+     * other field offset are unchanged and existing saved configurations
+     * still load -- they simply read 0 here and get the default.
+     */
+    uint16_t min_press_ms;
+    uint16_t reserved;           /* keeps toggle_rules at offset 12          */
     wire_toggle_rule_t toggle_rules[CFG_MAX_TOGGLE_RULES];
 } wire_settings_t;
+
+/* Default and permitted range for min_press_ms. */
+#define MIN_PRESS_MS_DEFAULT 48u
+#define MIN_PRESS_MS_FLOOR   8u
+#define MIN_PRESS_MS_CEILING 250u
 
 /* Settings flags. */
 #define SETF_REPORT_UNMAPPED (1u << 0) /* send EVT_IR for unmapped codes too */
