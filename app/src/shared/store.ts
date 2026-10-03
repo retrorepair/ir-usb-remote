@@ -2,7 +2,7 @@
  * store.ts - app state, persistence, and turning a profile plus a keymap into
  * the flat binding table the device wants.
  */
-import { ActionType, BIND_NO_REPEAT, type WireBinding } from './wire';
+import { ActionType, BIND_NO_REPEAT, BIND_HOLD, type WireBinding } from './wire';
 import { decodeKey } from './irProtocol';
 import {
   EMPTY_APP_DATA,
@@ -200,7 +200,9 @@ export function resolveBindings(profile: RemoteProfile, keymap: Keymap): Resolve
       action: action.type,
       mods: action.type === ActionType.Key ? action.mods : 0,
       code: action.usage,
-      flags: keymap.noRepeat[b.id] ? BIND_NO_REPEAT : 0,
+      flags:
+        (keymap.noRepeat[b.id] ? BIND_NO_REPEAT : 0) |
+        (keymap.hold?.[b.id] ? BIND_HOLD : 0),
     });
   }
 

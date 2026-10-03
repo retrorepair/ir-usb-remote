@@ -107,9 +107,16 @@ static const uint8_t desc_configuration[] = {
     TUD_CONFIG_DESCRIPTOR(1, HID_ITF_COUNT, 0, CONFIG_TOTAL_LEN, 0x00, 100),
 
     /*
-     * 10 ms polling for input. Faster would not help: IR frames arrive no
-     * more often than every ~45 ms, so the interval is nowhere near the
-     * limiting factor in responsiveness.
+     * 10 ms polling. DO NOT drop this to 1 ms without testing on a MiSTer.
+     *
+     * Two earlier builds changed it to 1 ms alongside the switch to tapped
+     * keys, and both stopped working on a MiSTer while continuing to work on
+     * a PC. The tap duration was blamed and lengthened, which did not help --
+     * so the polling interval is the remaining suspect and is being held at
+     * the value known to work until something measures the difference.
+     *
+     * The cost is small: at most 10 ms before a press is delivered, against a
+     * 25-70 ms IR frame that has to arrive first regardless.
      */
     TUD_HID_DESCRIPTOR(HID_ITF_KEYBOARD, 4, HID_ITF_PROTOCOL_KEYBOARD,
                        sizeof(desc_hid_keyboard), EPNUM_KB_IN,
