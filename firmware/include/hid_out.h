@@ -44,17 +44,6 @@ void hid_out_system_tap(uint16_t usage);
 /* Drop everything pending and release any held key (used when going idle). */
 void hid_out_reset(void);
 
-/*
- * Minimum time a tapped key stays down before its release is sent. Without a
- * floor, press and release go out on consecutive USB polls and the keypress
- * lasts a millisecond, which anything sampling at video frame rate misses.
- * 0 selects the firmware default.
- */
-void hid_out_set_min_press(uint16_t ms);
-
-/* True when nothing is queued and no minimum press time is still running. */
-bool hid_out_idle(void);
-
 /* Total reports delivered, for the diagnostics panel. */
 uint32_t hid_out_sent(void);
 

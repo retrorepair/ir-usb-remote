@@ -23,7 +23,7 @@ import {
 import { actionToText } from '../shared/actions';
 import { ActionType } from '../shared/wire';
 import type { Action } from '../shared/types';
-import { ActionPicker, type Behaviour } from './ActionPicker';
+import { ActionPicker } from './ActionPicker';
 
 export function KeymapPanel({ onNext }: { onNext: () => void }) {
   const data = useSyncExternalStore(subscribe, getSnapshot);
@@ -96,30 +96,18 @@ export function KeymapPanel({ onNext }: { onNext: () => void }) {
     );
   }
 
-  function setAction(buttonId: string, action: Action, behaviour: Behaviour) {
+  function setAction(buttonId: string, action: Action, noRepeat: boolean) {
     const bindings = { ...keymap!.bindings };
     const nr = { ...keymap!.noRepeat };
-    const hold = { ...(keymap!.hold ?? {}) };
-
     if (action.type === ActionType.None) {
       delete bindings[buttonId];
       delete nr[buttonId];
-      delete hold[buttonId];
     } else {
       bindings[buttonId] = action;
-      delete nr[buttonId];
-      delete hold[buttonId];
-      if (behaviour === 'once') nr[buttonId] = true;
-      else if (behaviour === 'hold') hold[buttonId] = true;
+      if (noRepeat) nr[buttonId] = true;
+      else delete nr[buttonId];
     }
-    updateKeymap({ ...keymap!, bindings, noRepeat: nr, hold });
-  }
-
-  /* Keymaps saved before 'hold' existed simply have no entry, so default. */
-  function behaviourOf(buttonId: string): Behaviour {
-    if (keymap!.hold?.[buttonId]) return 'hold';
-    if (keymap!.noRepeat[buttonId]) return 'once';
-    return 'repeat';
+    updateKeymap({ ...keymap!, bindings, noRepeat: nr });
   }
 
   const sorted = [...profile.buttons].sort((a, b) => a.row - b.row || a.col - b.col);
@@ -217,7 +205,7 @@ export function KeymapPanel({ onNext }: { onNext: () => void }) {
               <tr>
                 <th>Button</th>
                 <th>Sends</th>
-                <th>When held</th>
+                <th>Repeat while held</th>
                 <th>IR code</th>
                 <th />
               </tr>
@@ -235,13 +223,7 @@ export function KeymapPanel({ onNext }: { onNext: () => void }) {
                       {actionToText(a)}
                     </td>
                     <td className="hint">
-                      {!a
-                        ? '—'
-                        : behaviourOf(b.id) === 'once'
-                        ? 'once per press'
-                        : behaviourOf(b.id) === 'hold'
-                        ? 'key held down'
-                        : 'repeats while held'}
+                      {!a ? '—' : keymap.noRepeat[b.id] ? 'no, once per press' : 'yes'}
                     </td>
                     <td className="hint mono">{b.key ? '0x' + (BigInt(b.key) & 0xffn).toString(16).toUpperCase().padStart(2, '0') : '—'}</td>
                     <td style={{ textAlign: 'right' }}>
@@ -269,10 +251,10 @@ export function KeymapPanel({ onNext }: { onNext: () => void }) {
         <ActionPicker
           buttonLabel={editingButton.label}
           initial={keymap.bindings[editingButton.id]}
-          initialBehaviour={behaviourOf(editingButton.id)}
+          initialNoRepeat={!!keymap.noRepeat[editingButton.id]}
           onCancel={() => setEditing(null)}
-          onSave={(a, behaviour) => {
-            setAction(editingButton.id, a, behaviour);
+          onSave={(a, nr) => {
+            setAction(editingButton.id, a, nr);
             setEditing(null);
           }}
         />

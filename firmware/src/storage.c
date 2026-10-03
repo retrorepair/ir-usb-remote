@@ -38,32 +38,21 @@ void storage_defaults(ir_config_t *cfg)
     cfg->binding_count = 0;
 
     /*
-     * Repeat timing for every action type. A press always fires exactly once;
-     * these govern what happens if the button is then held.
-     *
-     * 400 ms before repeating starts is long enough that a deliberate single
-     * press never repeats by accident -- a remote sends several frames per
-     * press, and anything much shorter turns a firm press into two steps.
-     * 120 ms between repeats is about 8 per second, which scrolls a menu at a
-     * readable pace rather than shooting past the item you wanted.
+     * Timings only used for consumer and system actions, where the host does
+     * not apply its own key repeat. 400 ms before a held volume key starts
+     * ramping and 110 ms between steps feels like a TV remote; keyboard
+     * actions are held down instead and repeat at whatever rate the user has
+     * configured in their OS.
      */
     cfg->settings.repeat_delay_ms    = 400;
-    cfg->settings.repeat_rate_ms     = 120;
+    cfg->settings.repeat_rate_ms     = 110;
     /*
-     * Ceiling on how long after the last frame a button counts as released.
-     * The actual threshold is derived from the repeat interval the remote is
-     * measured to use -- 110 ms for NEC, 114 ms for RC5, 45 ms for Sony -- so
-     * a fast remote releases sooner than a slow one instead of everything
-     * waiting for the worst case. Raise this if a remote with poor reception
-     * stutters; it only ever loosens the derived value.
+     * Release after silence. Every protocol modelled here resends at least
+     * every 110 ms while a key is held, so 250 ms tolerates one dropped frame
+     * without the key appearing to stutter, and is short enough that the key
+     * does not linger noticeably after release.
      */
-    cfg->settings.release_timeout_ms = 200;
-    /*
-     * Minimum time a tapped key stays down. 48 ms spans three frames of a
-     * 60 Hz display, so a consumer that samples keyboard state once per frame
-     * -- a MiSTer core, for one -- cannot miss the press.
-     */
-    cfg->settings.min_press_ms       = MIN_PRESS_MS_DEFAULT;
+    cfg->settings.release_timeout_ms = 250;
     cfg->settings.led_mode           = 1; /* blink on receive */
     cfg->settings.flags              = SETF_REPORT_UNMAPPED;
 }

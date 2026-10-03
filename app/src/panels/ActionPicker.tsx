@@ -45,20 +45,18 @@ const CODE_TO_USAGE: Record<string, number> = (() => {
 
 type Kind = 'key' | 'media' | 'system';
 
-export type Behaviour = 'repeat' | 'once' | 'hold';
-
 export function ActionPicker({
   buttonLabel,
   initial,
-  initialBehaviour,
+  initialNoRepeat,
   onCancel,
   onSave,
 }: {
   buttonLabel: string;
   initial: Action | undefined;
-  initialBehaviour: Behaviour;
+  initialNoRepeat: boolean;
   onCancel: () => void;
-  onSave: (a: Action, behaviour: Behaviour) => void;
+  onSave: (a: Action, noRepeat: boolean) => void;
 }) {
   const [kind, setKind] = useState<Kind>(
     initial?.type === ActionType.Consumer ? 'media'
@@ -67,7 +65,7 @@ export function ActionPicker({
   );
   const [usage, setUsage] = useState(initial && initial.type !== ActionType.None ? initial.usage : 0);
   const [mods, setMods] = useState(initial?.type === ActionType.Key ? initial.mods : 0);
-  const [behaviour, setBehaviour] = useState<Behaviour>(initialBehaviour);
+  const [noRepeat, setNoRepeat] = useState(initialNoRepeat);
   const [capturing, setCapturing] = useState(false);
   const [filter, setFilter] = useState('');
 
@@ -194,28 +192,16 @@ export function ActionPicker({
             {groups.size === 0 && <p className="hint">Nothing matches “{filter}”.</p>}
           </div>
 
-          <div style={{ marginTop: 16 }}>
-            <span className="hint" style={{ display: 'block', marginBottom: 6 }}>
-              When the button is held
+          <label className="check" style={{ marginTop: 16 }}>
+            <input type="checkbox" checked={noRepeat} onChange={(e) => setNoRepeat(e.target.checked)} />
+            <span>
+              Fire once per press, never repeat
+              <div className="hint">
+                Right for power, play/pause and digits. Leave off for arrows and volume so
+                holding the button repeats.
+              </div>
             </span>
-            <select
-              value={behaviour}
-              onChange={(e) => setBehaviour(e.target.value as Behaviour)}
-              style={{ maxWidth: 340 }}
-            >
-              <option value="repeat">Repeat while held — arrows, volume, channel</option>
-              <option value="once">Fire once per press — power, play/pause, digits</option>
-              <option value="hold">Hold the key down — emulators and games</option>
-            </select>
-            <div className="hint" style={{ marginTop: 6 }}>
-              {behaviour === 'repeat' &&
-                'One keystroke per press. Holding repeats at the rate set under Diagnostics.'}
-              {behaviour === 'once' &&
-                'Exactly one keystroke no matter how long the button is held.'}
-              {behaviour === 'hold' &&
-                'The key stays pressed until you release the button, so the PC applies its own repeat. Right for holding a direction in a game; mushy for menus.'}
-            </div>
-          </div>
+          </label>
 
           <div className="banner info" style={{ marginTop: 14, marginBottom: 0 }}>
             Will send: <strong>{actionToText(action)}</strong>
@@ -224,13 +210,13 @@ export function ActionPicker({
         </div>
 
         <footer>
-          <button onClick={() => onSave({ type: ActionType.None }, 'repeat')}>Clear mapping</button>
+          <button onClick={() => onSave({ type: ActionType.None }, false)}>Clear mapping</button>
           <div className="spacer" />
           <button onClick={onCancel}>Cancel</button>
           <button
             className="primary"
             disabled={action.type === ActionType.None}
-            onClick={() => onSave(action, behaviour)}
+            onClick={() => onSave(action, noRepeat)}
           >
             Save
           </button>

@@ -107,21 +107,17 @@ static const uint8_t desc_configuration[] = {
     TUD_CONFIG_DESCRIPTOR(1, HID_ITF_COUNT, 0, CONFIG_TOTAL_LEN, 0x00, 100),
 
     /*
-     * 1 ms polling, not 10.
-     *
-     * A keystroke is two reports -- press then release -- and each one waits
-     * for its own poll, so a 10 ms interval added up to 20 ms of avoidable
-     * latency on every button, and more when several queued up. At 1 ms that
-     * becomes 2 ms. The cost is a little more bus traffic for a device that
-     * sends a handful of reports per second.
+     * 10 ms polling for input. Faster would not help: IR frames arrive no
+     * more often than every ~45 ms, so the interval is nowhere near the
+     * limiting factor in responsiveness.
      */
     TUD_HID_DESCRIPTOR(HID_ITF_KEYBOARD, 4, HID_ITF_PROTOCOL_KEYBOARD,
                        sizeof(desc_hid_keyboard), EPNUM_KB_IN,
-                       CFG_TUD_HID_EP_BUFSIZE, 1),
+                       CFG_TUD_HID_EP_BUFSIZE, 10),
 
     TUD_HID_DESCRIPTOR(HID_ITF_CONTROL, 5, HID_ITF_PROTOCOL_NONE,
                        sizeof(desc_hid_control), EPNUM_CTRL_IN,
-                       CFG_TUD_HID_EP_BUFSIZE, 1),
+                       CFG_TUD_HID_EP_BUFSIZE, 10),
 
     /* 5 ms, so streaming raw timing captures to the configurator feels live. */
     TUD_HID_INOUT_DESCRIPTOR(HID_ITF_CONFIG, 6, HID_ITF_PROTOCOL_NONE,

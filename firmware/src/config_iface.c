@@ -214,25 +214,13 @@ static void handle_set_settings(uint8_t seq, const uint8_t *pl, uint8_t len)
      */
     if (s.release_timeout_ms < 60)   s.release_timeout_ms = 60;
     if (s.release_timeout_ms > 2000) s.release_timeout_ms = 2000;
-    if (s.repeat_rate_ms < 60)       s.repeat_rate_ms = 60;
+    if (s.repeat_rate_ms < 20)       s.repeat_rate_ms = 20;
     if (s.repeat_rate_ms > 2000)     s.repeat_rate_ms = 2000;
     if (s.repeat_delay_ms > 5000)    s.repeat_delay_ms = 5000;
     if (s.led_mode > 2)              s.led_mode = 1;
-    if (s.min_press_ms != 0) {
-        if (s.min_press_ms < MIN_PRESS_MS_FLOOR)   s.min_press_ms = MIN_PRESS_MS_FLOOR;
-        if (s.min_press_ms > MIN_PRESS_MS_CEILING) s.min_press_ms = MIN_PRESS_MS_CEILING;
-    }
-    /*
-     * A repeat cannot arrive faster than a tap takes to complete, or taps
-     * queue up behind one another and the button lags further behind the
-     * longer it is held.
-     */
-    if (s.repeat_rate_ms < s.min_press_ms + 20u)
-        s.repeat_rate_ms = (uint16_t)(s.min_press_ms + 20u);
 
     s_cfg->settings = s;
     led_set_mode(s.led_mode);
-    hid_out_set_min_press(s.min_press_ms);
     s_dirty = true;
     tx_push(CMD_SET_SETTINGS, seq, WIRE_OK, NULL, 0);
 }

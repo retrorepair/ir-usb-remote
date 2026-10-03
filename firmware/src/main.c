@@ -37,7 +37,6 @@ int main(void)
     keymap_init(&g_cfg);
     led_init();
     led_set_mode(g_cfg.settings.led_mode);
-    hid_out_set_min_press(g_cfg.settings.min_press_ms);
     config_iface_init(&g_cfg);
     ir_capture_init();
 

@@ -1,38 +1,18 @@
 /*
- * keymap.c - binding lookup, and the behaviour of a pressed button.
+ * keymap.c - binding lookup, and the behaviour of a held button.
  *
- * ONE TAP PER PRESS, AND WE OWN THE REPEAT.
+ * Two different repeat strategies are used, because the host treats the two
+ * kinds of output differently:
  *
- * An earlier version held the key down for as long as frames kept arriving
- * and let the host auto-repeat it. That felt mushy, for two reasons that are
- * really the same reason:
+ *   Keyboard actions are HELD. The key stays in the report for as long as IR
+ *   frames keep arriving and is released once they stop. The host then
+ *   applies the user's own repeat delay and rate, so arrow keys on the remote
+ *   behave exactly like arrow keys on their keyboard.
  *
- *   - A single tap holds the key for the frame duration plus the release
- *     timeout, around 320 ms. A typical host repeat delay is 250 ms, so one
- *     tap crossed it and the host started firing at up to 30 per second.
- *   - Two taps closer together than the release timeout merged into one long
- *     hold, so the second press produced no keystroke at all.
- *
- * Worse, the feel depended entirely on the user's own keyboard repeat
- * settings, which we neither control nor can see.
- *
- * So a press now emits exactly one discrete keystroke, and repeating while
- * held is generated here, at a rate this firmware decides. Keyboard, consumer
- * and system actions all behave the same way. BIND_HOLD remains for the cases
- * that genuinely want a key held down, such as a direction in an emulator.
- *
- * DETECTING A NEW PRESS
- *
- * Timing alone cannot tell a fast double-tap from a held button, but the
- * protocols already carry the answer and the old code ignored it:
- *
- *   NEC         sends one full frame, then "ditto" frames every 110 ms while
- *               held. A full frame after a ditto is therefore a new press.
- *   RC5 / RC6   repeat the whole frame every ~114 ms with the toggle bit
- *               UNCHANGED. The toggle flipping is the protocol explicitly
- *               saying "this is a new press".
- *   Sony etc.   resend the identical frame every 45 ms with no marker, so
- *               there is nothing to do but time it.
+ *   Consumer and system actions are TAPPED, because hosts do not apply key
+ *   repeat to them -- a held volume key would move the volume exactly one
+ *   step. The ramp is therefore synthesised here from repeat_delay_ms and
+ *   repeat_rate_ms.
  */
 #include "keymap.h"
 #include "hid_out.h"
@@ -42,15 +22,12 @@
 static ir_config_t *s_cfg;
 static bool     s_emit = true;
 
-static uint64_t s_active_key  = IR_KEY_NONE;
-static int      s_active      = -1;
-static uint32_t s_last_ms     = 0;    /* arrival of the most recent frame   */
-static uint32_t s_interval_ms = 0;    /* measured gap between held frames   */
-static uint8_t  s_last_toggle = 0;
-static bool     s_seen_ditto  = false;/* this remote uses ditto repeats     */
-static uint16_t s_repeats     = 0;
-static bool     s_key_held    = false;/* a BIND_HOLD key is currently down  */
-static bool     s_suppress    = false;/* no repeating for this press        */
+static uint64_t s_active_key = IR_KEY_NONE;
+static int      s_active     = -1;   /* binding index for s_active_key, or -1 */
+static uint32_t s_last_ms    = 0;
+static uint16_t s_repeats    = 0;
+static bool     s_key_held   = false;
+static bool     s_suppress   = false;/* BIND_NO_REPEAT: ignore held frames   */
 static uint32_t s_next_tap_ms = 0;
 
 static inline uint32_t now_ms(void)
@@ -67,8 +44,6 @@ void keymap_init(ir_config_t *cfg)
     s_key_held = false;
     s_suppress = false;
     s_repeats = 0;
-    s_interval_ms = 0;
-    s_seen_ditto = false;
 }
 
 /* Extra toggle mask the configurator discovered for this protocol, if any. */
@@ -90,44 +65,6 @@ static int find_binding(uint64_t key)
     return -1;
 }
 
-static bool protocol_has_toggle(ir_protocol_t p)
-{
-    return p == IR_PROTO_RC5 || p == IR_PROTO_RC5X ||
-           p == IR_PROTO_RC6_0 || p == IR_PROTO_RC6_6A;
-}
-
-/*
- * How long after the last frame the button is considered released.
- *
- * Derived from the interval this remote is actually using rather than a fixed
- * timeout sized for the slowest protocol: a Sony remote repeating every 45 ms
- * should not need the 250 ms a NEC remote does. 2.2x tolerates one dropped
- * frame without a spurious release. The configured value is the ceiling, so
- * raising it still helps a remote with poor reception.
- */
-static uint32_t release_threshold_ms(void)
-{
-    const uint32_t configured = s_cfg->settings.release_timeout_ms;
-    if (!s_interval_ms) return configured;
-
-    uint32_t t = s_interval_ms * 2u + s_interval_ms / 5u;
-    if (t < 60u) t = 60u;
-    if (t > configured) t = configured;
-    return t;
-}
-
-/*
- * Repeating stops much sooner than the key is released. The release threshold
- * has to tolerate a dropped frame, but carrying on repeating for that long
- * after the user lets go is exactly the overshoot that makes navigation feel
- * like it slides past the item you wanted.
- */
-static uint32_t repeat_stale_ms(void)
-{
-    if (!s_interval_ms) return 150u;
-    return s_interval_ms + s_interval_ms / 3u;
-}
-
 static void release_held(void)
 {
     if (s_key_held) {
@@ -136,95 +73,70 @@ static void release_held(void)
     }
 }
 
-/* One discrete activation of a binding. */
-static void fire(const wire_binding_t *b)
+static void engage(const wire_binding_t *b)
 {
     switch (b->action) {
     case ACTION_KEY:
-        if (b->flags & BIND_HOLD) {
+        if (b->flags & BIND_NO_REPEAT) {
+            hid_out_key_tap(b->mods, (uint8_t)b->code);
+            s_suppress = true;
+        } else {
             hid_out_key_hold(b->mods, (uint8_t)b->code);
             s_key_held = true;
-        } else {
-            hid_out_key_tap(b->mods, (uint8_t)b->code);
         }
         break;
     case ACTION_CONSUMER:
         hid_out_consumer_tap(b->code);
+        s_suppress = (b->flags & BIND_NO_REPEAT) != 0;
+        s_next_tap_ms = now_ms() + s_cfg->settings.repeat_delay_ms;
         break;
     case ACTION_SYSTEM:
+        /*
+         * Never repeated regardless of the flag: a ramp of sleep requests is
+         * not a thing any user wants.
+         */
         hid_out_system_tap(b->code);
+        s_suppress = true;
         break;
     default:
         break;
     }
 }
 
-static void clear_active(void)
-{
-    release_held();
-    s_active_key  = IR_KEY_NONE;
-    s_active      = -1;
-    s_repeats     = 0;
-    s_suppress    = false;
-    s_interval_ms = 0;
-    s_seen_ditto  = false;
-}
-
 int keymap_handle_frame(const ir_frame_t *f)
 {
     const uint64_t key = ir_frame_key(f, extra_mask_for(f->protocol));
     const uint32_t now = now_ms();
-    const int      idx = find_binding(key);
 
-    const bool    is_ditto = (f->flags & IR_FLAG_REPEAT) != 0;
-    const uint8_t toggle   = (f->flags & IR_FLAG_TOGGLE) ? 1u : 0u;
+    const int idx = find_binding(key);
 
-    bool new_press;
-    if (key != s_active_key) {
-        new_press = true;
-    } else if (is_ditto) {
-        /* The protocol is stating outright that the button is still down. */
-        new_press = false;
-    } else if (s_seen_ditto) {
-        /*
-         * This remote has already shown it signals "held" with dittos, so a
-         * full frame can only mean the button was released and pressed again,
-         * however quickly that happened.
-         */
-        new_press = true;
-    } else if (protocol_has_toggle(f->protocol)) {
-        new_press = (toggle != s_last_toggle);
-    } else {
-        new_press = (now - s_last_ms) > release_threshold_ms();
-    }
+    /*
+     * "Same button still held" means the same identity arriving before the
+     * release timeout expires. Anything else is a new press, even if it is
+     * the same button after a gap.
+     */
+    const bool continuing = (key == s_active_key) &&
+                            (now - s_last_ms <= s_cfg->settings.release_timeout_ms);
+    s_last_ms = now;
 
-    if (new_press) {
-        clear_active();
-        s_active_key = key;
-        s_active     = idx;
-
-        if (idx >= 0 && s_emit) {
-            const wire_binding_t *b = &s_cfg->bindings[idx];
-            fire(b);
-            /*
-             * System actions never repeat regardless of the flag: a stream of
-             * sleep requests is not something anyone wants.
-             */
-            s_suppress = (b->flags & BIND_NO_REPEAT) != 0 ||
-                         b->action == ACTION_SYSTEM;
-            s_next_tap_ms = now + s_cfg->settings.repeat_delay_ms;
-        }
-    } else {
+    if (continuing) {
         if (s_repeats < 0xFFFFu) s_repeats++;
-        if (is_ditto) s_seen_ditto = true;
-
-        /* Learn this remote's repeat cadence from the remote itself. */
-        const uint32_t gap = now - s_last_ms;
-        if (gap >= 20u && gap <= 500u) s_interval_ms = gap;
+        /*
+         * Nothing to do for a continuing press: a held keyboard key is
+         * already down, and consumer ramping is driven by keymap_tick() so
+         * that its rate follows the configured interval rather than whatever
+         * rate the remote happens to resend at.
+         */
+        return idx;
     }
 
-    s_last_ms     = now;
-    s_last_toggle = toggle;
+    release_held();
+    s_active_key = key;
+    s_active     = idx;
+    s_repeats    = 0;
+    s_suppress   = false;
+
+    if (idx >= 0 && s_emit) engage(&s_cfg->bindings[idx]);
     return idx;
 }
 
@@ -234,31 +146,23 @@ void keymap_tick(void)
 
     const uint32_t now = now_ms();
 
-    if (now - s_last_ms > release_threshold_ms()) {
-        clear_active();
+    if (now - s_last_ms > s_cfg->settings.release_timeout_ms) {
+        release_held();
+        s_active_key = IR_KEY_NONE;
+        s_active     = -1;
+        s_repeats    = 0;
+        s_suppress   = false;
         return;
     }
 
     if (!s_emit || s_suppress || s_active < 0) return;
 
     const wire_binding_t *b = &s_cfg->bindings[s_active];
-
-    /* A held key is already down; there is nothing to repeat. */
-    if (b->action == ACTION_KEY && (b->flags & BIND_HOLD)) return;
-
-    /* Only repeat while frames are genuinely still arriving. */
-    if (now - s_last_ms > repeat_stale_ms()) return;
-
-    /*
-     * Never stack a repeat on top of a tap that is still being delivered.
-     * Each tap now holds the key for a minimum duration, so firing again
-     * before it finishes would queue presses faster than they drain.
-     */
-    if (!hid_out_idle()) return;
+    if (b->action != ACTION_CONSUMER) return;
 
     /* Signed comparison so the 49-day wrap of now_ms() cannot stall a ramp. */
     if ((int32_t)(now - s_next_tap_ms) >= 0) {
-        fire(b);
+        hid_out_consumer_tap(b->code);
         s_next_tap_ms = now + s_cfg->settings.repeat_rate_ms;
     }
 }
@@ -266,11 +170,19 @@ void keymap_tick(void)
 void keymap_set_emit(bool emit)
 {
     if (!emit) {
-        clear_active();
+        release_held();
         hid_out_reset();
+        /*
+         * Forget the active press as well. Otherwise returning from learn
+         * mode mid-press would treat the next frame as "still held" and never
+         * engage the binding.
+         */
+        s_active_key = IR_KEY_NONE;
+        s_active = -1;
+        s_suppress = false;
     }
     s_emit = emit;
 }
 
-uint64_t keymap_last_key(void)     { return s_active_key; }
-uint16_t keymap_repeat_count(void) { return s_repeats; }
+uint64_t keymap_last_key(void)    { return s_active_key; }
+uint16_t keymap_repeat_count(void){ return s_repeats; }
