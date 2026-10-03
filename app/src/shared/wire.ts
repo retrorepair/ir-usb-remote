@@ -82,7 +82,12 @@ export const KMOD = {
   RGUI: 1 << 7,
 } as const;
 
-export const BIND_NO_REPEAT = 1 << 0;
+/*
+ * Per-binding behaviour. Neither flag set is the default: one keystroke per
+ * press, then repeat at the configured delay and rate while held.
+ */
+export const BIND_NO_REPEAT = 1 << 0; // fire exactly once, never repeat
+export const BIND_HOLD = 1 << 1;      // hold the key down while the button is held
 export const SETF_REPORT_UNMAPPED = 1 << 0;
 
 // ---------------------------------------------------------------------------

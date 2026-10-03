@@ -58,8 +58,14 @@ export interface Keymap {
   name: string;
   /** buttonId -> action. Buttons absent from here simply do nothing. */
   bindings: Record<string, Action>;
-  /** buttonId -> suppress auto-repeat (power, play/pause, digits). */
+  /** buttonId -> fire once per press, never repeat (power, play/pause, digits). */
   noRepeat: Record<string, boolean>;
+  /**
+   * buttonId -> hold the key down while the button is held, instead of
+   * tapping. For emulators and games, where a direction must stay pressed.
+   * Optional so keymaps saved before this existed still load.
+   */
+  hold?: Record<string, boolean>;
   updated: string;
 }
 

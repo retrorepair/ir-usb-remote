@@ -119,8 +119,22 @@ typedef enum {
 #define KMOD_RALT   (1u << 6)
 #define KMOD_RGUI   (1u << 7)
 
-/* Per-binding flags. */
-#define BIND_NO_REPEAT (1u << 0) /* ignore auto-repeat while the key is held */
+/*
+ * Per-binding flags, selecting one of three behaviours:
+ *
+ *   (neither)        tap once per press, then auto-repeat at the configured
+ *                    delay and rate while the button is held. The default.
+ *   BIND_NO_REPEAT   tap exactly once per press, never repeat.
+ *   BIND_HOLD        hold the key down for as long as the button is held.
+ *
+ * BIND_HOLD exists for emulators and games, where a direction genuinely needs
+ * to stay pressed. It is NOT the default: handing the host a long key-down
+ * makes the feel depend on the user's own OS repeat settings, and a single
+ * tap is easily long enough to cross a typical 250 ms repeat delay and set
+ * the host repeating at 30/sec.
+ */
+#define BIND_NO_REPEAT (1u << 0)
+#define BIND_HOLD      (1u << 1)
 
 /* 16 bytes. A power of two, and three fit in one report with room spare. */
 typedef struct {
