@@ -86,6 +86,18 @@ every Windows target hits it.
 With a shared one they resolve to the same filename and the portable build
 silently overwrites the installer, leaving one file where two were expected.
 
+**DO NOT change the HID polling interval to 1 ms.** `usb_descriptors.c` sets
+bInterval to 10 for the keyboard and control interfaces. Two builds lowered it
+to 1 ms and both stopped working on a MiSTer while continuing to work fine on
+a PC; a third build, identical except for keeping 10 ms, works on both. The
+saving was at most 10 ms against a 25-70 ms IR frame, so it buys almost
+nothing and costs a platform.
+
+That episode is also a lesson about method: the first fix attempt blamed tap
+duration, shipped a theory, and failed, because the two changes had been made
+in one commit and never separated. With one failing platform and no way to
+observe it, change one variable at a time.
+
 **Do not use `sed -i '/^$/d'`-style blank-line stripping on source files.** It
 destroys readability across the whole file.
 

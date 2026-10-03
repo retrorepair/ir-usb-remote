@@ -6,7 +6,7 @@
  * apart on purpose: re-learning a code or renaming a button here cannot
  * disturb a keyboard mapping, because mappings refer to buttons by id.
  */
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { useDevice } from '../useDevice';
 import { useIrStream } from '../useDevice';
 import type { IrEventWithRaw } from '../shared/device';
@@ -467,6 +467,25 @@ function LayoutEditor({
     setOutcome(null);
   }
 
+  /*
+   * Buttons sharing one IR code almost always mean the profile was learned
+   * against a firmware that could not decode this remote properly -- a Sky
+   * remote read every button as address 0 command 0 until RC6's 20-bit form
+   * was handled, so a whole layout ended up on one identity. Re-saving such a
+   * profile writes stale codes and nothing works, which is a miserable thing
+   * to debug blind.
+   */
+  const duplicateCodes = useMemo(() => {
+    const byKey = new Map<string, string[]>();
+    for (const b of profile.buttons) {
+      if (!b.key) continue;
+      const list = byKey.get(b.key) ?? [];
+      list.push(b.label);
+      byKey.set(b.key, list);
+    }
+    return [...byKey.values()].filter((labels) => labels.length > 1);
+  }, [profile.buttons]);
+
   const learned = profile.buttons.filter((b) => b.key).length;
   const sorted = [...profile.buttons].sort((a, b) => a.row - b.row || a.col - b.col);
   const sel = profile.buttons.find((b) => b.id === selected) ?? null;
@@ -519,6 +538,23 @@ function LayoutEditor({
           {profile.address.toString(16).toUpperCase()}
         </p>
       </div>
+
+      {duplicateCodes.length > 0 && (
+        <div className="banner warn">
+          <strong>
+            {duplicateCodes.length === 1
+              ? 'Two or more buttons share the same IR code.'
+              : `${duplicateCodes.length} sets of buttons share the same IR code.`}
+          </strong>{' '}
+          Only the first of each gets written to the receiver, so the rest will
+          do nothing. This usually means the layout was learned before the
+          firmware could decode this remote properly — re-learn the affected
+          buttons, or delete the remote and set it up again.
+          <div className="hint" style={{ marginTop: 6 }}>
+            {duplicateCodes.map((labels) => labels.join(' = ')).join(' · ')}
+          </div>
+        </div>
+      )}
 
       {unknownPress && (
         <div className="banner info">
